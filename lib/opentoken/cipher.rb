@@ -21,8 +21,8 @@ module OpenToken
       cipher
     end
 
-    def generate_key
-      OpenToken::PasswordKeyGenerator.generate OpenToken.password, self
+    def generate_key(password)
+      OpenToken::PasswordKeyGenerator.generate password, self
     end
     def generate_iv
       OpenSSL::Random.random_bytes(iv_length)
@@ -50,7 +50,7 @@ module OpenToken
     def crypt(operation, key, iv)
       crypt = OpenSSL::Cipher::Cipher.new(algorithm)
       crypt.send operation
-      crypt.key = key 
+      crypt.key = key
       crypt.iv = iv
       crypt
     end

@@ -13,7 +13,7 @@ require File.join(File.dirname(__FILE__), 'opentoken', 'cipher')
 module OpenToken
   class TokenInvalidError < StandardError;  end
 
-  class << self
+  class OTK
     attr_accessor :debug
     def debug?
       !!debug
@@ -23,15 +23,21 @@ module OpenToken
     attr_accessor :token_lifetime
     attr_accessor :renew_until_lifetime
 
+    def initialize(password:, token_lifetime: 300, renew_until_lifetime: 43200)
+      @password = password
+      @token_lifetime = token_lifetime
+      @renew_until_lifetime = renew_until_lifetime
+    end
+
     def encode(attributes, cipher)
       attributes['not-before'] = Time.now.utc.iso8601.to_s
-      attributes['not-on-or-after'] = Time.at(Time.now.to_i + token_lifetime).utc.iso8601.to_s
-      attributes['renew-until'] = Time.at(Time.now.to_i + renew_until_lifetime).utc.iso8601.to_s
+      attributes['not-on-or-after'] = Time.at(Time.now.to_i + @token_lifetime).utc.iso8601.to_s
+      attributes['renew-until'] = Time.at(Time.now.to_i + @renew_until_lifetime).utc.iso8601.to_s
 
       serialized = OpenToken::KeyValueSerializer.serialize(attributes)
       compressed = zip_payload serialized
 
-      key = cipher.generate_key
+      key = cipher.generate_key(@password)
       iv = cipher.generate_iv
       encrypted = cipher.encrypt_payload compressed, key, iv
 
@@ -91,7 +97,7 @@ module OpenToken
       verify encrypted_payload.length == payload_length, "Payload length is #{encrypted_payload.length} and was expected to be #{payload_length}"
       inspect_binary_string "ENCRYPTED PAYLOAD [#{payload_offset}..#{data.length - 1}]", encrypted_payload
 
-      key = cipher.generate_key
+      key = cipher.generate_key(@password)
       inspect_binary_string 'KEY', key
 
       compressed_payload = cipher.decrypt_payload encrypted_payload, key, iv
@@ -166,9 +172,9 @@ module OpenToken
       return unless debug?
       puts "#{header}:"
       index = 0
-      string.each_byte do |b| 
-        puts "#{index}: #{b} => #{b.chr}" 
-        index += 1 
+      string.each_byte do |b|
+        puts "#{index}: #{b} => #{b.chr}"
+        index += 1
       end
     end
     def force_encoding(string, encoding)
@@ -176,7 +182,3 @@ module OpenToken
     end
   end
 end
-
-# intialize defaults
-OpenToken.token_lifetime = 300
-OpenToken.renew_until_lifetime = 43200
